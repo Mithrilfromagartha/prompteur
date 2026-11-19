@@ -46,7 +46,6 @@
     <button id="petit" type="button" aria-label="Texte plus petit">A−</button>
     <span id="taille"></span>
     <button id="grand" type="button" aria-label="Texte plus grand">A+</button>
-    <button id="plein" type="button">Plein écran</button>
     <div id="etat"></div>
   </header>
   <button id="stop" type="button">■ Arrêter</button>
@@ -97,18 +96,6 @@ function poserTaille(k) {
   $("taille").textContent = TAILLES[t] > 100 ? "max +" : TAILLES[t] + " %";
   garder("sl:taille", TAILLES[t]);
   ajuster();
-}
-
-// iPhone : pas de plein écran pour une page ; il passe par l'icône sur l'écran d'accueil (sans barre Safari).
-function pleinEcran() {
-  const d = document.documentElement, ouvrir = d.requestFullscreen || d.webkitRequestFullscreen;
-  if (document.fullscreenElement || document.webkitFullscreenElement) { (document.exitFullscreen || document.webkitExitFullscreen).call(document); return; }
-  if (ouvrir) { try { const p = ouvrir.call(d); if (p && p.catch) p.catch(conseilIphone); } catch (_) { conseilIphone(); } }
-  else conseilIphone();
-}
-function conseilIphone() {
-  $("etat").className = "alerte";
-  $("etat").textContent = "Sur iPhone : bouton Partager, puis « Sur l'écran d'accueil », puis ouvre l'icône Prompteur : plein écran, sans la barre de Safari.";
 }
 
 function afficher() {
@@ -224,8 +211,6 @@ $("go").addEventListener("click", basculer);
 $("stop").addEventListener("click", e => { e.stopPropagation(); basculer(); });
 $("petit").addEventListener("click", () => poserTaille(t - 1));
 $("grand").addEventListener("click", () => poserTaille(t + 1));
-$("plein").addEventListener("click", pleinEcran);
-if (navigator.standalone || matchMedia("(display-mode: standalone)").matches) $("plein").hidden = true;
 $("prec").addEventListener("click", () => avancer(-1));
 $("suiv").addEventListener("click", () => avancer(1));
 $("video").addEventListener("change", e => { v = +e.target.value; m = 0; fini = false; afficher(); e.target.blur(); });
@@ -238,7 +223,6 @@ document.addEventListener("keydown", e => {
   else if (e.key.toLowerCase() === "m") basculer();
   else if (e.key === "+" || e.key === "=") poserTaille(t + 1);
   else if (e.key === "-") poserTaille(t - 1);
-  else if (e.key.toLowerCase() === "f") pleinEcran();
 });
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && ecoute) garderEveille(); });
 window.addEventListener("resize", ajuster);
