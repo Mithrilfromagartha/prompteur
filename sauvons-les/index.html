@@ -1,4 +1,4 @@
-<!doctype html><html lang="fr"><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"></head><body><title>Prompteur Sauvons Les</title>
+<!doctype html><html lang="fr"><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Prompteur"><meta name="theme-color" content="#04121c"></head><body><title>Prompteur Sauvons Les</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap">
 <style>
@@ -27,7 +27,12 @@
   #suite { color:var(--discret); font-size:clamp(14px, 3.2vh, 22px); line-height:1.3; }
   #suite b { color:var(--accent); font-weight:700; letter-spacing:.05em; font-size:.8em; margin-right:.5em; }
   #fin { font-weight:700; color:var(--accent); }
-  body.joue #haut { opacity:.35; }
+  /* Micro actif : la barre disparaît pour laisser toute la place au texte ; un petit bouton reste pour arrêter. */
+  body.joue #haut { display:none; }
+  #stop { position:fixed; top:calc(6px + env(safe-area-inset-top, 0px)); right:max(10px, env(safe-area-inset-right, 0px)); min-height:34px; padding:0 10px; opacity:.45; font-size:14px; z-index:2; }
+  body:not(.joue) #stop { display:none; }
+  body.sans-suite #suite { display:none; }
+  #taille { min-width:3.2em; text-align:center; color:var(--discret); font-variant-numeric:tabular-nums; }
   @media (prefers-reduced-motion:no-preference) { #morceau { transition:opacity .15s; } }
 </style>
 
@@ -38,8 +43,13 @@
     <button id="prec" type="button" aria-label="Phrase précédente">‹</button>
     <button id="suiv" type="button" aria-label="Phrase suivante">›</button>
     <span id="compte"></span>
+    <button id="petit" type="button" aria-label="Texte plus petit">A−</button>
+    <span id="taille"></span>
+    <button id="grand" type="button" aria-label="Texte plus grand">A+</button>
+    <button id="plein" type="button">Plein écran</button>
     <div id="etat"></div>
   </header>
+  <button id="stop" type="button">■ Arrêter</button>
   <main id="scene" aria-live="polite">
     <div id="morceau"></div>
     <div id="suite"></div>
@@ -60,6 +70,10 @@ const SAFARI = /iP(hone|ad|od)|Macintosh/.test(navigator.userAgent) && !window.c
 let piste = null;
 
 let v = Math.min(lire("sl:v", 0), VIDEOS.length - 1), m = 0, fini = false;
+// Taille du texte : 100 % = le plus grand qui tient ; au-delà, la ligne « Ensuite » disparaît pour laisser la place.
+const TAILLES = [50, 60, 70, 80, 90, 100, 110];
+let t = TAILLES.indexOf(lire("sl:taille", 100));
+if (t < 0) t = 5;
 let ecoute = false, rec = null, base = 0, veille = null, cible = [], vus = 0;
 
 VIDEOS.forEach((x, k) => { const o = document.createElement("option"); o.value = k; o.textContent = `Vidéo ${k + 1} · ${x.date} · ${x.titre}`; $("video").appendChild(o); });
@@ -73,7 +87,28 @@ function ajuster() {
     const place = sc.clientHeight - $("suite").offsetHeight - 24;
     if (el.scrollHeight <= place && el.scrollWidth <= sc.clientWidth) lo = t; else hi = t;
   }
-  el.style.fontSize = lo + "px";
+  const f = Math.min(TAILLES[t], 100) / 100;
+  el.style.fontSize = Math.max(16, Math.floor(lo * f)) + "px";
+}
+
+function poserTaille(k) {
+  t = Math.max(0, Math.min(TAILLES.length - 1, k));
+  document.body.classList.toggle("sans-suite", TAILLES[t] > 100);
+  $("taille").textContent = TAILLES[t] > 100 ? "max +" : TAILLES[t] + " %";
+  garder("sl:taille", TAILLES[t]);
+  ajuster();
+}
+
+// iPhone : pas de plein écran pour une page ; il passe par l'icône sur l'écran d'accueil (sans barre Safari).
+function pleinEcran() {
+  const d = document.documentElement, ouvrir = d.requestFullscreen || d.webkitRequestFullscreen;
+  if (document.fullscreenElement || document.webkitFullscreenElement) { (document.exitFullscreen || document.webkitExitFullscreen).call(document); return; }
+  if (ouvrir) { try { const p = ouvrir.call(d); if (p && p.catch) p.catch(conseilIphone); } catch (_) { conseilIphone(); } }
+  else conseilIphone();
+}
+function conseilIphone() {
+  $("etat").className = "alerte";
+  $("etat").textContent = "Sur iPhone : bouton Partager, puis « Sur l'écran d'accueil », puis ouvre l'icône Prompteur : plein écran, sans la barre de Safari.";
 }
 
 function afficher() {
@@ -167,14 +202,14 @@ async function garderEveille() { try { if (navigator.wakeLock) veille = await na
 function arreter() {
   if (piste) { piste.stop(); piste = null; }
   ecoute = false; const r = rec; rec = null; if (r) try { r.stop(); } catch (_) {}
-  document.body.classList.remove("joue");
+  document.body.classList.remove("joue"); ajuster();
   $("go").textContent = "Écouter ma voix"; $("go").classList.remove("actif");
 }
 
 async function basculer() {
   if (ecoute) { arreter(); $("etat").textContent = ""; return; }
   if (!Reco) { sansMicro(); return; }
-  ecoute = true; document.body.classList.add("joue");
+  ecoute = true; document.body.classList.add("joue"); ajuster();
   $("go").textContent = "Micro actif · arrêter"; $("go").classList.add("actif");
   $("etat").className = ""; $("etat").textContent = "J'écoute : lis la phrase à voix haute";
   garderEveille();
@@ -186,6 +221,11 @@ async function basculer() {
 }
 
 $("go").addEventListener("click", basculer);
+$("stop").addEventListener("click", e => { e.stopPropagation(); basculer(); });
+$("petit").addEventListener("click", () => poserTaille(t - 1));
+$("grand").addEventListener("click", () => poserTaille(t + 1));
+$("plein").addEventListener("click", pleinEcran);
+if (navigator.standalone || matchMedia("(display-mode: standalone)").matches) $("plein").hidden = true;
 $("prec").addEventListener("click", () => avancer(-1));
 $("suiv").addEventListener("click", () => avancer(1));
 $("video").addEventListener("change", e => { v = +e.target.value; m = 0; fini = false; afficher(); e.target.blur(); });
@@ -196,11 +236,15 @@ document.addEventListener("keydown", e => {
   if (e.key === "ArrowRight" || e.key === " " || e.key === "PageDown") { e.preventDefault(); avancer(1); }
   else if (e.key === "ArrowLeft" || e.key === "PageUp") avancer(-1);
   else if (e.key.toLowerCase() === "m") basculer();
+  else if (e.key === "+" || e.key === "=") poserTaille(t + 1);
+  else if (e.key === "-") poserTaille(t - 1);
+  else if (e.key.toLowerCase() === "f") pleinEcran();
 });
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && ecoute) garderEveille(); });
 window.addEventListener("resize", ajuster);
 if (document.fonts) document.fonts.ready.then(ajuster);
 if (!Reco) $("go").hidden = true;
 afficher();
+poserTaille(t);
 </script>
 </body></html>
