@@ -1,206 +1,27 @@
-<!doctype html><html lang="fr"><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"></head><body><title>Prompteur Sauvons Les</title>
-<meta name="claude:viewport-fit-sides" content="cover">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Prompteurs</title>
 <style>
-  /* Un iPhone posé en paysage devant Charles : un morceau de phrase à la fois, le plus gros possible, la suite en petit dessous. */
-  :root {
-    --fond:#04121c; --panneau:#0b2433; --filet:#1d4255; --texte:#f4f7f8; --discret:#8fb0bd;
-    --dit:#4f6f7c; --accent:#78e6dc; --alerte:#ffb15c;
-    --lecture:"Atkinson Hyperlegible","Segoe UI",Arial,sans-serif;
-    color-scheme:dark;
-  }
+  :root { --fond:#04121c; --carte:#0b2433; --filet:#1d4255; --texte:#f4f7f8; --discret:#8fb0bd; --accent:#78e6dc; color-scheme:dark; }
   * { box-sizing:border-box; }
-  html, body { height:100%; margin:0; overflow:hidden; background:var(--fond); color:var(--texte); font-family:var(--lecture); -webkit-text-size-adjust:100%; }
-  #app { height:100%; display:flex; flex-direction:column; padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); }
-  #haut { display:flex; align-items:center; gap:8px; padding-block:6px; font-size:15px; flex-wrap:wrap; }
-  #haut select { flex:1 1 12em; min-width:0; }
-  select, button { min-height:40px; padding:0 12px; border:1px solid var(--filet); border-radius:8px; background:var(--panneau); color:var(--texte); font:inherit; cursor:pointer; }
-  button:focus-visible, select:focus-visible { outline:3px solid var(--accent); outline-offset:2px; }
-  #go { background:var(--accent); border-color:var(--accent); color:var(--fond); font-weight:700; }
-  #go.actif { background:var(--panneau); border-color:var(--accent); color:var(--accent); }
-  #compte { color:var(--discret); font-variant-numeric:tabular-nums; white-space:nowrap; }
-  #etat { flex-basis:100%; color:var(--discret); font-size:13px; min-height:1.2em; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
-  #etat.alerte { color:var(--alerte); }
-  #scene { flex:1; min-height:0; display:flex; flex-direction:column; justify-content:center; gap:.6em; cursor:pointer; user-select:none; -webkit-user-select:none; padding-block:4px 10px; }
-  #morceau { font-weight:700; line-height:1.18; text-wrap:balance; overflow-wrap:break-word; }
-  #morceau .dit { color:var(--dit); }
-  #suite { color:var(--discret); font-size:clamp(14px, 3.2vh, 22px); line-height:1.3; }
-  #suite b { color:var(--accent); font-weight:700; letter-spacing:.05em; font-size:.8em; margin-right:.5em; }
-  #fin { font-weight:700; color:var(--accent); }
-  body.joue #haut { opacity:.35; }
-  @media (prefers-reduced-motion:no-preference) { #morceau { transition:opacity .15s; } }
+  body { margin:0; min-height:100vh; background:var(--fond); color:var(--texte); font:18px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+         padding:max(24px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) 24px max(16px, env(safe-area-inset-left, 0px)); }
+  h1 { font-size:28px; margin:0 0 20px; }
+  ul { list-style:none; margin:0; padding:0; display:grid; gap:12px; max-width:560px; }
+  a { display:block; padding:18px 20px; border:1px solid var(--filet); border-radius:12px; background:var(--carte); color:var(--texte); text-decoration:none; }
+  a:hover, a:focus-visible { border-color:var(--accent); outline:none; }
+  a b { display:block; font-size:20px; }
+  a span { color:var(--discret); font-size:15px; }
 </style>
-
-<div id="app">
-  <header id="haut">
-    <select id="video" aria-label="Vidéo à tourner"></select>
-    <button id="go" type="button">Écouter ma voix</button>
-    <button id="prec" type="button" aria-label="Phrase précédente">‹</button>
-    <button id="suiv" type="button" aria-label="Phrase suivante">›</button>
-    <span id="compte"></span>
-    <div id="etat"></div>
-  </header>
-  <main id="scene" aria-live="polite">
-    <div id="morceau"></div>
-    <div id="suite"></div>
-  </main>
-</div>
-
-<script>
-const VIDEOS = [{"date": "20/11", "titre": "les orques d'Antibes", "morceaux": ["Ces deux orques vivent seules dans un parc fermé depuis presque deux ans.", "Oui frérot, le Marineland d'Antibes a fermé, sauf que la maman et son fils sont restés là.", "Et téma le plan drone, de l'eau verte, de la rouille partout, on dirait The Last of Us.", "Mais le pire, c'est que leurs potes dauphins du même parc sont partis en Espagne cet été, et que l'un d'eux, Rocky, est mort moins de trois mois après.", "Et maintenant, c'est le tour des orques, et le gouvernement veut les envoyer en Espagne aussi, dans un parc qui fait encore des spectacles.", "Abonne-toi, à mille abonnés je pourrai partager la pétition.", "Franchement, tu trouves ça normal ?"]}, {"date": "21/11", "titre": "ce qui change le 2 décembre", "morceaux": ["Le 2 décembre, en France, garder un dauphin dans un bassin, ce sera interdit, sauf qu'il y a un piège, genre « It's a trap ».", "Et ouais frérot, c'est une vraie loi, votée il y a cinq ans, et elle dit stop aux spectacles et stop aux bébés nés en bassin.", "Du coup, les parcs ont eu cinq ans pour trouver une solution.", "Sauf que le jour arrive, et y a deux orques à Antibes et onze dauphins près de Nantes qui savent pas où ils vont finir.", "Et le piège, je te le montre lundi.", "Abonne-toi, à mille abonnés je pourrai partager la pétition.", "T'y crois, toi, à cette loi ?"]}, {"date": "22/11", "titre": "les 11 dauphins près de Nantes", "morceaux": ["Ces onze dauphins devaient déménager, et maintenant, ils ont plus nulle part où aller, comme Tom Hanks dans Le Terminal.", "Ils vivent dans un parc près de Nantes, et comme la loi arrive, le zoo de Beauval avait promis de les prendre.", "Sauf que fin août, Beauval a lâché l'affaire, parce que ça coûtait beaucoup trop cher.", "Du coup, retour à la case départ.", "Et le pire, c'est qu'une asso dit qu'ils vont finir à l'autre bout du monde, en Asie, sauf que pour l'instant, rien n'est confirmé.", "Si t'as le seum, abonne-toi, à mille abonnés on partage la pétition.", "Toi, tu les enverrais où ?"]}, {"date": "23/11", "titre": "le piège de la science", "morceaux": ["Comme promis, la loi qui interdit les dauphins en bassin a un piège, et ce piège, c'est la science.", "Si un parc dit qu'il fait de la recherche, il a le droit de garder ses dauphins et même de leur faire faire des bébés, comme une carte sortie de prison.", "Sauf que personne a encore écrit ce que c'est, de la vraie recherche.", "Du coup, qui va décider si c'est de la science ou du pipeau ?", "Et le pire, c'est que le parc près de Nantes, avec ses onze dauphins, disait en 2023 que c'était son cas.", "Abonne-toi, à mille abonnés je partage les pétitions.", "Vraie science ou grosse excuse ?"]}, {"date": "24/11", "titre": "Rocky", "morceaux": ["Ce dauphin est parti en pleine nuit, et moins de trois mois après, il était mort.", "Il s'appelait Rocky, comme le boxeur, il avait vingt-neuf ans, et il vivait à Antibes, dans un parc fermé.", "Du coup, en juillet, on l'a mis dans un camion puis dans un avion pour l'Espagne, avec sept autres dauphins, en plein été.", "Sauf qu'une asso avait prévenu qu'un voyage comme ça, l'été, ça peut tuer.", "Et en octobre, Rocky meurt, et depuis, aucune explication, silence radio.", "Si ça te met la rage, abonne-toi, à mille abonnés la pétition passe en bio.", "Pour toi, quelqu'un doit payer ?"]}, {"date": "25/11", "titre": "le parc de Tenerife", "morceaux": ["Le gouvernement veut envoyer nos deux dernières orques dans un parc où quatre orques sont mortes en quatre ans.", "Elles s'appellent Wikie et Keijo, une maman et son fils, et elles sont toutes seules dans un parc fermé.", "Ce nouveau parc, il est à Tenerife, en Espagne, et là-bas, téma, y a encore des spectacles d'orques, genre Free Willy à l'envers.", "Et le plus fou, c'est que les scientifiques espagnols avaient déjà dit non, à cause des bassins trop petits.", "Et pourtant, le ministre dit que c'est la meilleure solution.", "Chaque abonné compte, à mille abonnés la pétition passe en bio.", "Si t'étais ministre, tu dis oui ou non ?"]}];
-const $ = id => document.getElementById(id);
-const lire = (k, d) => { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (_) { return d; } };
-const garder = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} };
-const norm = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "");
-const mots = s => s.split(/\s+/).map(norm).filter(Boolean);
-const Reco = window.SpeechRecognition || window.webkitSpeechRecognition;
-// Chrome : on lui passe la piste du micro (sans ça, texte vide au test du 4/11 sur L'Émerveillement, et le micro redemandé à chaque relance).
-// Safari (iPhone) ouvre le micro lui-même.
-const SAFARI = /iP(hone|ad|od)|Macintosh/.test(navigator.userAgent) && !window.chrome && !/CriOS|FxiOS|EdgiOS/.test(navigator.userAgent);
-let piste = null;
-
-let v = Math.min(lire("sl:v", 0), VIDEOS.length - 1), m = 0, fini = false;
-let ecoute = false, rec = null, base = 0, veille = null, cible = [], vus = 0;
-
-VIDEOS.forEach((x, k) => { const o = document.createElement("option"); o.value = k; o.textContent = `Vidéo ${k + 1} · ${x.date} · ${x.titre}`; $("video").appendChild(o); });
-
-// Le morceau prend toute la place qu'il peut sans déborder.
-function ajuster() {
-  const el = $("morceau"), sc = $("scene");
-  let hi = 200, lo = 16;
-  while (hi - lo > 1) {
-    const t = (hi + lo) >> 1; el.style.fontSize = t + "px";
-    const place = sc.clientHeight - $("suite").offsetHeight - 24;
-    if (el.scrollHeight <= place && el.scrollWidth <= sc.clientWidth) lo = t; else hi = t;
-  }
-  el.style.fontSize = lo + "px";
-}
-
-function afficher() {
-  const V = VIDEOS[v], el = $("morceau");
-  $("video").value = v;
-  el.innerHTML = "";
-  if (fini) {
-    el.innerHTML = `<span id="fin">Vidéo ${v + 1} finie.</span>`;
-    $("suite").innerHTML = v < VIDEOS.length - 1
-      ? `<b>ENSUITE</b>Vidéo ${v + 2} · ${VIDEOS[v + 1].titre} : dis « suivante » ou touche l'écran`
-      : "C'était la dernière. Bravo frérot.";
-    cible = []; $("compte").textContent = ""; ajuster(); return;
-  }
-  const txt = V.morceaux[m];
-  cible = [];
-  txt.split(" ").forEach(w => { const s = document.createElement("span"); s.textContent = w + " "; el.appendChild(s); if (norm(w)) cible.push({ n: norm(w), el: s }); });
-  vus = 0;
-  const apres = V.morceaux[m + 1];
-  $("suite").innerHTML = apres ? `<b>ENSUITE</b>${apres.split(" ").slice(0, 8).join(" ")}…` : "<b>FIN</b>c'est la dernière phrase de la vidéo";
-  $("compte").textContent = `${m + 1} / ${V.morceaux.length}`;
-  garder("sl:v", v);
-  ajuster();
-}
-
-function avancer(sens) {
-  const V = VIDEOS[v];
-  if (fini) {
-    if (sens > 0 && v < VIDEOS.length - 1) { v++; m = 0; fini = false; }
-    else if (sens < 0) { fini = false; m = V.morceaux.length - 1; }
-  } else if (sens > 0) { if (m < V.morceaux.length - 1) m++; else fini = true; }
-  else if (m > 0) m--;
-  else if (v > 0) { v--; m = VIDEOS[v].morceaux.length - 1; }
-  afficher();
-}
-
-function proches(a, b) {
-  if (a === b) return true;
-  return a.length >= 4 && b.length >= 4 && (a.startsWith(b.slice(0, 4)) || b.startsWith(a.slice(0, 4)));
-}
-
-// Ce qui a été entendu depuis le début du morceau : on avance quand presque tout le morceau est dit, fin comprise.
-function entendu(texte, final) {
-  $("etat").className = ""; $("etat").textContent = "J'entends : " + texte.trim().split(/\s+/).slice(-10).join(" ");
-  const tout = mots(texte), h = tout.slice(Math.min(consommes, tout.length));
-  dernierCompte = tout.length;
-  if (fini) { if (h.some(w => /^suivant/.test(w))) avancer(1); return; }
-  let k = 0;
-  for (const w of h) if (k < cible.length && (proches(w, cible[k].n) || (k + 1 < cible.length && proches(w, cible[k + 1].n) && ++k))) k++;
-  vus = Math.max(vus, k);
-  cible.forEach((c, j) => c.el.classList.toggle("dit", j < vus));
-  const part = vus / Math.max(1, cible.length);
-  const finDite = h.slice(-3).some(w => proches(w, cible[cible.length - 1].n));
-  if ((part >= 0.7 && finDite) || part >= 0.9 || (final && part >= 0.5)) suivantApresDit();
-}
-
-let attente = null;
-function suivantApresDit() {
-  if (attente) return;
-  consommes = dernierCompte;  // les mots déjà entendus appartiennent au morceau qu'on quitte
-  attente = setTimeout(() => { attente = null; avancer(1); }, 350);
-}
-
-// Safari (iPhone) peut tout mettre dans un seul résultat qui grandit : on compte les mots consommés plutôt que les résultats.
-let consommes = 0, dernierCompte = 0;
-function demarrerReco() {
-  const r = rec = new Reco();
-  r.lang = "fr-FR"; r.continuous = true; r.interimResults = true; base = 0; consommes = 0;
-  r.onresult = e => {
-    if (r !== rec) return;
-    let t = "", final = false;
-    for (let j = base; j < e.results.length; j++) { t += " " + e.results[j][0].transcript; final = e.results[j].isFinal; }
-    // Une phrase finie qui ne correspond à rien : on l'oublie, pour ne pas mélanger deux morceaux.
-    entendu(t, final);
-    if (final) { base = e.results.length; consommes = 0; }
-  };
-  r.onerror = e => {
-    if (["not-allowed", "service-not-allowed", "audio-capture"].includes(e.error)) { arreter(); sansMicro(); }
-    else if (e.error === "network") { $("etat").className = "alerte"; $("etat").textContent = "Pas d'Internet : la reconnaissance de la voix en a besoin"; }
-  };
-  r.onend = () => { if (ecoute && r === rec) setTimeout(() => { if (ecoute && r === rec) demarrerReco(); }, 150); };
-  try { if (piste) r.start(piste); else r.start(); } catch (_) { try { r.start(); } catch (_) { arreter(); sansMicro(); } }
-}
-
-function sansMicro() {
-  $("etat").className = "alerte";
-  $("etat").textContent = "Le micro n'est pas disponible ici : touche l'écran pour passer à la phrase suivante (à gauche pour revenir).";
-}
-
-async function garderEveille() { try { if (navigator.wakeLock) veille = await navigator.wakeLock.request("screen"); } catch (_) { veille = null; } }
-
-function arreter() {
-  if (piste) { piste.stop(); piste = null; }
-  ecoute = false; const r = rec; rec = null; if (r) try { r.stop(); } catch (_) {}
-  document.body.classList.remove("joue");
-  $("go").textContent = "Écouter ma voix"; $("go").classList.remove("actif");
-}
-
-async function basculer() {
-  if (ecoute) { arreter(); $("etat").textContent = ""; return; }
-  if (!Reco) { sansMicro(); return; }
-  ecoute = true; document.body.classList.add("joue");
-  $("go").textContent = "Micro actif · arrêter"; $("go").classList.add("actif");
-  $("etat").className = ""; $("etat").textContent = "J'écoute : lis la phrase à voix haute";
-  garderEveille();
-  if (!SAFARI && navigator.mediaDevices) {
-    try { const f = await navigator.mediaDevices.getUserMedia({ audio: true }); if (!ecoute) { f.getTracks().forEach(t => t.stop()); return; } piste = f.getAudioTracks()[0]; }
-    catch (_) { arreter(); sansMicro(); return; }
-  }
-  demarrerReco();
-}
-
-$("go").addEventListener("click", basculer);
-$("prec").addEventListener("click", () => avancer(-1));
-$("suiv").addEventListener("click", () => avancer(1));
-$("video").addEventListener("change", e => { v = +e.target.value; m = 0; fini = false; afficher(); e.target.blur(); });
-// Toucher l'écran : à droite la suite, sur le tiers gauche le retour.
-$("scene").addEventListener("click", e => avancer(e.clientX < window.innerWidth / 3 ? -1 : 1));
-document.addEventListener("keydown", e => {
-  if (e.target.matches("select")) return;
-  if (e.key === "ArrowRight" || e.key === " " || e.key === "PageDown") { e.preventDefault(); avancer(1); }
-  else if (e.key === "ArrowLeft" || e.key === "PageUp") avancer(-1);
-  else if (e.key.toLowerCase() === "m") basculer();
-});
-document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && ecoute) garderEveille(); });
-window.addEventListener("resize", ajuster);
-if (document.fonts) document.fonts.ready.then(ajuster);
-if (!Reco) $("go").hidden = true;
-afficher();
-</script>
-</body></html>
+</head>
+<body>
+<h1>Prompteurs</h1>
+<ul>
+  <li><a href="sauvons-les/"><b>Sauvons Les</b><span>Série « 2 décembre », vidéos du 20 au 25/11</span></a></li>
+</ul>
+</body>
+</html>
