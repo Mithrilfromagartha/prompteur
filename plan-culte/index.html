@@ -1,0 +1,234 @@
+<!doctype html><html lang="fr"><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Prompteur"><meta name="theme-color" content="#04121c"><title>Prompteur Plan Culte</title></head><body><title>Prompteur Plan Culte</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<style>
+  /* Un iPhone posé en paysage devant Charles : un morceau de phrase à la fois, le plus gros possible, la suite en petit dessous. */
+  :root {
+    --fond:#04121c; --panneau:#0b2433; --filet:#1d4255; --texte:#f4f7f8; --discret:#8fb0bd;
+    --dit:#4f6f7c; --accent:#78e6dc; --alerte:#ffb15c;
+    --lecture:"Atkinson Hyperlegible","Segoe UI",Arial,sans-serif;
+    color-scheme:dark;
+  }
+  * { box-sizing:border-box; }
+  html, body { height:100%; margin:0; overflow:hidden; background:var(--fond); color:var(--texte); font-family:var(--lecture); -webkit-text-size-adjust:100%; }
+  #app { height:100%; display:flex; flex-direction:column; padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); }
+  #haut { display:flex; align-items:center; gap:8px; padding-block:6px; font-size:15px; flex-wrap:wrap; }
+  #haut select { flex:1 1 12em; min-width:0; }
+  select, button { min-height:40px; padding:0 12px; border:1px solid var(--filet); border-radius:8px; background:var(--panneau); color:var(--texte); font:inherit; cursor:pointer; }
+  button:focus-visible, select:focus-visible { outline:3px solid var(--accent); outline-offset:2px; }
+  #go { background:var(--accent); border-color:var(--accent); color:var(--fond); font-weight:700; }
+  #go.actif { background:var(--panneau); border-color:var(--accent); color:var(--accent); }
+  #compte { color:var(--discret); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  #etat { flex-basis:100%; color:var(--discret); font-size:13px; min-height:1.2em; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+  #etat.alerte { color:var(--alerte); }
+  #scene { flex:1; min-height:0; display:flex; flex-direction:column; justify-content:center; gap:.6em; cursor:pointer; user-select:none; -webkit-user-select:none; padding-block:4px 10px; }
+  #morceau { font-weight:700; line-height:1.18; text-wrap:balance; overflow-wrap:break-word; }
+  #morceau .dit { color:var(--dit); }
+  #suite { color:var(--discret); font-size:clamp(14px, 3.2vh, 22px); line-height:1.3; }
+  #suite b { color:var(--accent); font-weight:700; letter-spacing:.05em; font-size:.8em; margin-right:.5em; }
+  #fin { font-weight:700; color:var(--accent); }
+  /* Micro actif : la barre disparaît pour laisser toute la place au texte ; un petit bouton reste pour arrêter. */
+  body.joue #haut { display:none; }
+  #stop { position:fixed; top:calc(6px + env(safe-area-inset-top, 0px)); right:max(10px, env(safe-area-inset-right, 0px)); min-height:34px; padding:0 10px; opacity:.45; font-size:14px; z-index:2; }
+  body:not(.joue) #stop { display:none; }
+  body.sans-suite #suite { display:none; }
+  #taille { min-width:3.2em; text-align:center; color:var(--discret); font-variant-numeric:tabular-nums; }
+  @media (prefers-reduced-motion:no-preference) { #morceau { transition:opacity .15s; } }
+</style>
+
+<div id="app">
+  <header id="haut">
+    <select id="video" aria-label="Vidéo à tourner"></select>
+    <button id="go" type="button">Écouter ma voix</button>
+    <button id="prec" type="button" aria-label="Phrase précédente">‹</button>
+    <button id="suiv" type="button" aria-label="Phrase suivante">›</button>
+    <span id="compte"></span>
+    <button id="petit" type="button" aria-label="Texte plus petit">A−</button>
+    <span id="taille"></span>
+    <button id="grand" type="button" aria-label="Texte plus grand">A+</button>
+    <div id="etat"></div>
+  </header>
+  <button id="stop" type="button">■ Arrêter</button>
+  <main id="scene" aria-live="polite">
+    <div id="morceau"></div>
+    <div id="suite"></div>
+  </main>
+</div>
+
+<script>
+const VIDEOS = [{"date": "26/11", "titre": "Retour vers le futur", "morceaux": ["T'as forcément plus de 40 ans si tu connais Retour vers le futur.", "Et je sais de quoi je parle : je suis né le 2 novembre 1932, le jour où l'armée australienne est partie en guerre contre des émeus.", "Et le film que tu connais, c'est la deuxième version.", "Au départ, Marty McFly, c'est Eric Stoltz.", "Le tournage commence fin novembre 1984, et il joue le rôle pendant plus d'un mois.", "Sauf que le réalisateur, Robert Zemeckis, regarde les images et se rend compte qu'il s'est trompé.", "Stoltz joue Marty trop sérieux, alors que le film doit être drôle.", "Le 10 janvier 1985, Zemeckis le vire.", "Tu sais combien ça a coûté ?", "Environ quatre millions de dollars de plus, pour refaire les scènes déjà tournées.", "Le problème, c'est que Michael J. Fox tourne déjà une série.", "Alors il fait les deux : la série le jour, le film la nuit.", "Il raconte qu'il dort environ trois heures par nuit, pendant des mois.", "Et il sort quand même le 3 juillet 1985 aux États-Unis, le 30 octobre en France.", "Et même après tout ça, Stoltz est encore dans le film.", "Au café de 1955, le poing qui frappe Biff, c'est le sien, dit Thomas F. Wilson, qui joue Biff.", "Parce que cette scène n'a jamais été retournée.", "Zemeckis dira même que le virer, c'est le pire moment de sa carrière.", "Et sans ce renvoi, pas de Michael J. Fox dans la DeLorean.", "Marty, c'est Fox ou Stoltz ?"]}, {"date": "27/11", "titre": "L'Histoire sans fin", "morceaux": ["Dans L'Histoire sans fin, le plus gros détail caché, c'est que l'auteur du livre détestait le film.", "Et je sais de quoi je parle : je suis né le 27 novembre 1838, le jour où la France a bombardé Veracruz pour une affaire de pâtisseries.", "Le film sort en 1984, et c'est un énorme succès mondial.", "Mais Michael Ende, l'écrivain, le découvre en projection privée, et il repart furieux.", "Pour lui, c'est un mélodrame géant de kitsch, de commerce, de peluche et de plastique.", "Du coup, il exige qu'on change le titre ou qu'on arrête tout.", "Les producteurs refusent, alors il veut retirer son nom, et il les attaque en justice.", "Et il perd.", "Le tribunal estime que les changements importent peu, puisque le film vise des enfants.", "Et tu sais quoi ?", "Pendant ce temps, sur le plateau, une scène rend tout le monde malade : celle d'Artax.", "Le cheval qui s'enfonce dans les marais de la Tristesse, c'est la mort de la mère de Bambi, version cheval.", "Le réalisateur, Wolfgang Petersen, dit que toute l'équipe redoutait de la tourner.", "Il a fallu deux chevaux identiques, entraînés pendant des semaines.", "Et l'acteur d'Atreyu, Noah Hathaway, passe environ trois semaines dans une eau glacée.", "Il raconte même qu'il s'est évanoui pendant la scène, et que des plongeurs ont dû le sortir.", "Résultat, cette scène a marqué toute une génération.", "Un film adoré des enfants, et renié par son propre auteur.", "Quelle scène t'a traumatisé quand t'étais petit ?"]}, {"date": "28/11", "titre": "Poltergeist", "morceaux": ["Dans Poltergeist, la scène de la piscine a été tournée avec de vrais squelettes humains.", "Et je sais de quoi je parle : je suis né en octobre 1739, le mois où l'Angleterre a déclaré la guerre à l'Espagne pour une oreille.", "Dans la scène, JoBeth Williams tombe dans un trou de boue rempli de cadavres.", "Et les os autour d'elle, ce ne sont pas des accessoires en plastique.", "Et tu sais quoi ? On le sait grâce à un procès.", "En 1982, des scénaristes attaquent Spielberg en justice, et le maquilleur du film, Craig Reardon, est interrogé sous serment.", "Il explique qu'il a acheté de vrais squelettes médicaux, ceux qu'on utilise pour étudier.", "Le but, c'était de faire des économies : des faux en caoutchouc coûtaient trop cher.", "Et l'actrice, elle, croyait que c'étaient des faux.", "Elle ne l'a appris qu'après, alors qu'elle avait passé quatre ou cinq jours à tourner dans cette boue.", "Attention : l'histoire repose sur le maquilleur et l'actrice, et le studio n'a rien confirmé.", "Certains y voient la cause d'une malédiction autour de la saga.", "Mais le maquilleur trouve ce lien choquant, et aucune preuve ne le soutient.", "Malgré tout ça, aux États-Unis, le film est classé PG, donc ouvert aux enfants avec accord parental.", "Les censeurs lui avaient d'abord mis un R, le niveau des films pour adultes.", "Alors Spielberg, le papa d'E.T., est allé plaider devant eux, et il a gagné.", "Tu l'aurais deviné, que c'étaient de vrais os ?"]}, {"date": "29/11", "titre": "Jurassic Park", "morceaux": ["T'as forcément plus de 33 ans si tu connais Jurassic Park.", "Et je sais de quoi je parle : je suis né le 15 juin 1859, le jour où un cochon a failli déclencher une guerre entre les États-Unis et l'Angleterre.", "Alors, ce rugissement du T. rex, tu l'as encore dans l'oreille.", "Sauf que personne ne sait comment criait un dinosaure.", "Du coup, le sound designer Gary Rydstrom a mélangé des animaux.", "Le cri aigu, c'est un bébé éléphant.", "Le grondement grave, c'est un alligator.", "Et le grognement qui fait peur, c'est un félin, tigre ou lion selon ses interviews.", "Trois animaux, un seul monstre : une vraie fusion façon Dragon Ball.", "Le plus fou : le bébé éléphant n'a poussé ce cri qu'une seule fois.", "Donc c'est le même enregistrement à chaque rugissement du film.", "Et les dinosaures, tu crois qu'on les voit combien de temps ?", "Quinze minutes, sur deux heures sept de film.", "Neuf minutes de robots géants, fabriqués par Stan Winston.", "Seulement six minutes en images de synthèse, signées ILM.", "Au départ, les dinosaures devaient être animés en stop-motion, image par image.", "Puis un test du T. rex en images de synthèse a tout changé.", "Résultat : trois Oscars en 1994, dont deux pour le son.", "Et plus de 900 millions de dollars de recettes à sa sortie.", "Quinze minutes de dinosaures, un cri recyclé, et le monde entier a eu peur.", "Tu l'avais vu au cinéma, toi ?"]}, {"date": "30/11", "titre": "E.T.", "morceaux": ["Dans E.T. l'extra-terrestre, Spielberg a effacé les fusils des agents.", "Il les a remplacés par des talkies-walkies.", "Et je sais de quoi je parle : je suis né le 14 juillet 1969, le jour où a commencé la guerre du football entre le Salvador et le Honduras, à cause d'un match de qualification.", "Pour ceux qui ne l'ont pas vu : un petit alien se cache chez Elliott, un gamin, et le gouvernement le traque.", "Dans la version de 1982, les agents qui poursuivent les enfants sont armés.", "En 2002, vingt ans après, Spielberg ressort le film, retouché par ordinateur.", "Et là, en mode censure, leurs fusils deviennent des talkies-walkies.", "Les critiques se moquent, et South Park en fait même un épisode.", "Et ce n'est pas tout : à Halloween, la mère dit « hippie » au lieu de « terroriste ».", "Et aujourd'hui, qu'est-ce que Spielberg en pense ?", "En 2011, il dit avoir été trop sensible aux critiques de parents à la sortie du film.", "Et il avoue avoir volé aux fans leurs souvenirs d'E.T.", "Alors en 2012, pour les trente ans du film, les fusils reviennent dans l'édition Blu-ray.", "Et en 2023, il le redit : « C'était une erreur. »", "Du coup, c'est la version de 1982 qu'on trouve en Blu-ray.", "Et tu sais quoi ?", "Moi, franchement, je préfère E.T. comme il était en 1982, tel que les fans l'ont aimé.", "Tu l'avais vu avec les fusils ou les talkies ?"]}];
+const $ = id => document.getElementById(id);
+const lire = (k, d) => { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (_) { return d; } };
+const garder = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} };
+const norm = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "");
+const mots = s => s.split(/\s+/).map(norm).filter(Boolean);
+const Reco = window.SpeechRecognition || window.webkitSpeechRecognition;
+// Chrome : on lui passe la piste du micro (sans ça, texte vide au test du 4/11 sur L'Émerveillement, et le micro redemandé à chaque relance).
+// Safari (iPhone) ouvre le micro lui-même.
+const SAFARI = /iP(hone|ad|od)|Macintosh/.test(navigator.userAgent) && !window.chrome && !/CriOS|FxiOS|EdgiOS/.test(navigator.userAgent);
+let piste = null;
+
+let v = Math.min(lire("sl:v", 0), VIDEOS.length - 1), m = 0, fini = false;
+// Taille du texte : 100 % = le plus grand qui tient ; au-delà, la ligne « Ensuite » disparaît pour laisser la place.
+const TAILLES = [50, 60, 70, 80, 90, 100, 110];
+let t = TAILLES.indexOf(lire("sl:taille", 100));
+if (t < 0) t = 5;
+let ecoute = false, rec = null, base = 0, veille = null, cible = [], vus = 0;
+
+VIDEOS.forEach((x, k) => { const o = document.createElement("option"); o.value = k; o.textContent = `Vidéo ${k + 1} · ${x.date} · ${x.titre}`; $("video").appendChild(o); });
+
+// Le morceau prend toute la place qu'il peut sans déborder.
+function ajuster() {
+  const el = $("morceau"), sc = $("scene");
+  let hi = 200, lo = 16;
+  while (hi - lo > 1) {
+    const t = (hi + lo) >> 1; el.style.fontSize = t + "px";
+    const place = sc.clientHeight - $("suite").offsetHeight - 24;
+    if (el.scrollHeight <= place && el.scrollWidth <= sc.clientWidth) lo = t; else hi = t;
+  }
+  const f = Math.min(TAILLES[t], 100) / 100;
+  el.style.fontSize = Math.max(16, Math.floor(lo * f)) + "px";
+}
+
+function poserTaille(k) {
+  t = Math.max(0, Math.min(TAILLES.length - 1, k));
+  document.body.classList.toggle("sans-suite", TAILLES[t] > 100);
+  $("taille").textContent = TAILLES[t] > 100 ? "max +" : TAILLES[t] + " %";
+  garder("sl:taille", TAILLES[t]);
+  ajuster();
+}
+
+function afficher() {
+  const V = VIDEOS[v], el = $("morceau");
+  $("video").value = v;
+  el.innerHTML = "";
+  if (fini) {
+    el.innerHTML = `<span id="fin">Vidéo ${v + 1} finie.</span>`;
+    $("suite").innerHTML = v < VIDEOS.length - 1
+      ? `<b>ENSUITE</b>Vidéo ${v + 2} · ${VIDEOS[v + 1].titre} : dis « suivante » ou touche l'écran`
+      : "C'était la dernière. Bravo frérot.";
+    cible = []; $("compte").textContent = ""; ajuster(); return;
+  }
+  const txt = V.morceaux[m];
+  cible = [];
+  txt.split(" ").forEach(w => { const s = document.createElement("span"); s.textContent = w + " "; el.appendChild(s); if (norm(w)) cible.push({ n: norm(w), el: s }); });
+  vus = 0;
+  const apres = V.morceaux[m + 1];
+  $("suite").innerHTML = apres ? `<b>ENSUITE</b>${apres.split(" ").slice(0, 8).join(" ")}…` : "<b>FIN</b>c'est la dernière phrase de la vidéo";
+  $("compte").textContent = `${m + 1} / ${V.morceaux.length}`;
+  garder("sl:v", v);
+  ajuster();
+}
+
+function avancer(sens) {
+  const V = VIDEOS[v];
+  if (fini) {
+    if (sens > 0 && v < VIDEOS.length - 1) { v++; m = 0; fini = false; }
+    else if (sens < 0) { fini = false; m = V.morceaux.length - 1; }
+  } else if (sens > 0) { if (m < V.morceaux.length - 1) m++; else fini = true; }
+  else if (m > 0) m--;
+  else if (v > 0) { v--; m = VIDEOS[v].morceaux.length - 1; }
+  afficher();
+}
+
+function proches(a, b) {
+  if (a === b) return true;
+  return a.length >= 4 && b.length >= 4 && (a.startsWith(b.slice(0, 4)) || b.startsWith(a.slice(0, 4)));
+}
+
+// Ce qui a été entendu depuis le début du morceau : on avance quand presque tout le morceau est dit, fin comprise.
+function entendu(texte, final) {
+  $("etat").className = ""; $("etat").textContent = "J'entends : " + texte.trim().split(/\s+/).slice(-10).join(" ");
+  const tout = mots(texte), h = tout.slice(Math.min(consommes, tout.length));
+  dernierCompte = tout.length;
+  if (fini) { if (h.some(w => /^suivant/.test(w))) avancer(1); return; }
+  let k = 0;
+  for (const w of h) if (k < cible.length && (proches(w, cible[k].n) || (k + 1 < cible.length && proches(w, cible[k + 1].n) && ++k))) k++;
+  vus = Math.max(vus, k);
+  cible.forEach((c, j) => c.el.classList.toggle("dit", j < vus));
+  const part = vus / Math.max(1, cible.length);
+  const finDite = h.slice(-3).some(w => proches(w, cible[cible.length - 1].n));
+  if ((part >= 0.7 && finDite) || part >= 0.9 || (final && part >= 0.5)) suivantApresDit();
+}
+
+let attente = null;
+function suivantApresDit() {
+  if (attente) return;
+  consommes = dernierCompte;  // les mots déjà entendus appartiennent au morceau qu'on quitte
+  attente = setTimeout(() => { attente = null; avancer(1); }, 350);
+}
+
+// Safari (iPhone) peut tout mettre dans un seul résultat qui grandit : on compte les mots consommés plutôt que les résultats.
+let consommes = 0, dernierCompte = 0;
+function demarrerReco() {
+  const r = rec = new Reco();
+  r.lang = "fr-FR"; r.continuous = true; r.interimResults = true; base = 0; consommes = 0;
+  r.onresult = e => {
+    if (r !== rec) return;
+    let t = "", final = false;
+    for (let j = base; j < e.results.length; j++) { t += " " + e.results[j][0].transcript; final = e.results[j].isFinal; }
+    // Une phrase finie qui ne correspond à rien : on l'oublie, pour ne pas mélanger deux morceaux.
+    entendu(t, final);
+    if (final) { base = e.results.length; consommes = 0; }
+  };
+  r.onerror = e => {
+    if (["not-allowed", "service-not-allowed", "audio-capture"].includes(e.error)) { arreter(); sansMicro(); }
+    else if (e.error === "network") { $("etat").className = "alerte"; $("etat").textContent = "Pas d'Internet : la reconnaissance de la voix en a besoin"; }
+  };
+  r.onend = () => { if (ecoute && r === rec) setTimeout(() => { if (ecoute && r === rec) demarrerReco(); }, 150); };
+  try { if (piste) r.start(piste); else r.start(); } catch (_) { try { r.start(); } catch (_) { arreter(); sansMicro(); } }
+}
+
+function sansMicro() {
+  $("etat").className = "alerte";
+  $("etat").textContent = "Le micro n'est pas disponible ici : touche l'écran pour passer à la phrase suivante (à gauche pour revenir).";
+}
+
+async function garderEveille() { try { if (navigator.wakeLock) veille = await navigator.wakeLock.request("screen"); } catch (_) { veille = null; } }
+
+function arreter() {
+  if (piste) { piste.stop(); piste = null; }
+  ecoute = false; const r = rec; rec = null; if (r) try { r.stop(); } catch (_) {}
+  document.body.classList.remove("joue"); ajuster();
+  $("go").textContent = "Écouter ma voix"; $("go").classList.remove("actif");
+}
+
+async function basculer() {
+  if (ecoute) { arreter(); $("etat").textContent = ""; return; }
+  if (!Reco) { sansMicro(); return; }
+  ecoute = true; document.body.classList.add("joue"); ajuster();
+  $("go").textContent = "Micro actif · arrêter"; $("go").classList.add("actif");
+  $("etat").className = ""; $("etat").textContent = "J'écoute : lis la phrase à voix haute";
+  garderEveille();
+  if (!SAFARI && navigator.mediaDevices) {
+    try { const f = await navigator.mediaDevices.getUserMedia({ audio: true }); if (!ecoute) { f.getTracks().forEach(t => t.stop()); return; } piste = f.getAudioTracks()[0]; }
+    catch (_) { arreter(); sansMicro(); return; }
+  }
+  demarrerReco();
+}
+
+$("go").addEventListener("click", basculer);
+$("stop").addEventListener("click", e => { e.stopPropagation(); basculer(); });
+$("petit").addEventListener("click", () => poserTaille(t - 1));
+$("grand").addEventListener("click", () => poserTaille(t + 1));
+$("prec").addEventListener("click", () => avancer(-1));
+$("suiv").addEventListener("click", () => avancer(1));
+$("video").addEventListener("change", e => { v = +e.target.value; m = 0; fini = false; afficher(); e.target.blur(); });
+// Toucher l'écran : à droite la suite, sur le tiers gauche le retour.
+$("scene").addEventListener("click", e => avancer(e.clientX < window.innerWidth / 3 ? -1 : 1));
+document.addEventListener("keydown", e => {
+  if (e.target.matches("select")) return;
+  if (e.key === "ArrowRight" || e.key === " " || e.key === "PageDown") { e.preventDefault(); avancer(1); }
+  else if (e.key === "ArrowLeft" || e.key === "PageUp") avancer(-1);
+  else if (e.key.toLowerCase() === "m") basculer();
+  else if (e.key === "+" || e.key === "=") poserTaille(t + 1);
+  else if (e.key === "-") poserTaille(t - 1);
+});
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && ecoute) garderEveille(); });
+window.addEventListener("resize", ajuster);
+if (document.fonts) document.fonts.ready.then(ajuster);
+if (!Reco) $("go").hidden = true;
+afficher();
+poserTaille(t);
+</script>
+</body></html>
