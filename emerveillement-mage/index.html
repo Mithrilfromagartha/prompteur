@@ -1,0 +1,403 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light}body{margin:0;font:14px system-ui}[hidden]{display:none!important}</style></head><body><title>Prompteur Émerveillement ep03 : reprises du mage</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<style>
+  /* Une seule ambiance, sombre : un écran de prompteur, mêmes couleurs que la chaîne. Le texte passe sur une ligne de lecture fixe, près de l'objectif. */
+  :root {
+    --fond:#07090f; --panneau:#111623; --filet:#2a3142; --texte:#f3ead4; --discret:#a2a9ba;
+    --dit:#5b5f6b; --or:#ffd25e; --cam:#e8b04a; --voix:#6fb3ff; --surligne:rgba(255,210,94,.22);
+    --lecture:"Atkinson Hyperlegible","Segoe UI",Arial,sans-serif; --taille:60px; color-scheme:dark;
+  }
+  * { box-sizing:border-box; }
+  html, body { height:100%; margin:0; overflow:hidden; background:var(--fond); color:var(--texte); font-family:var(--lecture); }
+  #app { height:100%; display:flex; flex-direction:column; padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); }
+  #haut, #bas { display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; padding-block:10px; font-size:16px; transition:opacity .25s; }
+  body.joue #haut, body.joue #bas { opacity:.14; }
+  body.joue #haut:hover, body.joue #bas:hover, body.joue #haut:focus-within, body.joue #bas:focus-within { opacity:1; }
+  select, button { min-height:44px; padding:0 14px; border:1px solid var(--filet); border-radius:8px; background:var(--panneau); color:var(--texte); font:inherit; cursor:pointer; }
+  select { min-width:0; max-width:100%; }
+  button:hover, select:hover { border-color:var(--discret); }
+  button:focus-visible, select:focus-visible { outline:3px solid var(--or); outline-offset:2px; }
+  #lecture, #micro { min-width:150px; }
+  #lecture, body.voix-ok #micro { background:var(--or); border-color:var(--or); color:var(--fond); font-weight:700; }
+  body.voix-ok #lecture { background:var(--panneau); border-color:var(--filet); color:var(--texte); font-weight:400; }
+  body.voix-ok #micro.actif { background:#1f6f3a; border-color:#1f6f3a; color:#fff; }
+  body.ecoute #lecture, body.ecoute .vit { display:none; }
+  /* Prompteur à vitre : la vitre renvoie l'écran à l'envers, on retourne le texte seul ; les boutons restent lisibles. */
+  body.miroir #cadre { transform:scaleX(-1); }
+  #miroir.actif { border-color:var(--or); color:var(--or); }
+  #type { font-weight:700; letter-spacing:.06em; }
+  #type.camera { color:var(--cam); } #type.voix { color:var(--voix); } #type.reel { color:var(--or); }
+  #duree, #aide { color:var(--discret); }
+  #duree { font-variant-numeric:tabular-nums; }
+  #aide { font-size:14px; flex-basis:100%; }
+  .reglage { display:flex; align-items:center; gap:6px; }
+  #vitesse { min-width:6.2em; text-align:center; font-variant-numeric:tabular-nums; }
+  #cadre { position:relative; flex:1; min-height:0; }
+  #scene { position:absolute; inset:0; overflow-y:auto; scrollbar-width:none; user-select:none; -webkit-user-select:none; cursor:pointer; }
+  #scene::-webkit-scrollbar { display:none; }
+  .marge-haut { height:30%; } .marge-bas { height:70%; }
+  #texte, #suite { width:min(100%, calc(var(--taille) * 22)); margin-inline:auto; font-size:var(--taille); }
+  #texte { line-height:1.35; font-weight:700; overflow-wrap:break-word; }
+  .obj { background:var(--surligne); }
+  .dit { color:var(--dit); }
+  .ici { color:var(--or); text-decoration:underline; text-underline-offset:.15em; }
+  .obj-label { display:inline-block; margin-right:.5em; padding:.2em .6em; border-radius:6px; background:var(--or); color:var(--fond); font-size:max(.34em, 14px); line-height:1.3; letter-spacing:.06em; vertical-align:middle; }
+  #suite { margin-top:.8em; color:var(--discret); font-size:calc(var(--taille) * .45); }
+  #voile { position:absolute; inset:0 0 70% 0; background:linear-gradient(var(--fond) 10%, rgba(7,9,15,.55)); pointer-events:none; }
+  #repere { position:absolute; top:30%; left:-14px; width:0; height:0; margin-top:.35em; border-block:9px solid transparent; border-left:12px solid var(--or); pointer-events:none; font-size:var(--taille); }
+  #decompte { position:absolute; inset:0; display:grid; place-items:center; background:rgba(7,9,15,.82); color:var(--or); font-size:min(40vw, 220px); font-weight:700; font-variant-numeric:tabular-nums; pointer-events:none; }
+  @media (max-width:700px) {
+    #aide, #plein { display:none; }
+    #lecture, body.voix-ok #micro { flex:1 1 100%; order:-1; }
+    body.voix-ok #lecture { flex:1 1 auto; order:0; }
+    #haut, #bas { gap:6px 8px; padding-block:6px; }
+    select, button { padding:0 10px; }
+    body.joue #bas, body.joue #haut { display:none; }
+  }
+  @media (prefers-reduced-motion:reduce) { #haut, #bas { transition:none; } }
+</style>
+
+<div id="app">
+  <header id="haut">
+    <select id="filtre" aria-label="Blocs affichés">
+      <option value="tout">Tous les blocs</option>
+      <option value="camera">Blocs caméra</option>
+      <option value="voix">Blocs voix off</option>
+      <option value="reel">Reels verticaux</option>
+    </select>
+    <select id="bloc" aria-label="Aller au bloc"></select>
+    <span id="type"></span>
+    <span id="duree"></span>
+  </header>
+  <div id="cadre">
+    <main id="scene" aria-live="off">
+      <div class="marge-haut"></div>
+      <div id="texte"></div>
+      <div id="suite"></div>
+      <div class="marge-bas"></div>
+    </main>
+    <div id="voile"></div>
+    <div id="repere"></div>
+    <div id="decompte" hidden></div>
+  </div>
+  <footer id="bas">
+    <button id="micro" type="button" hidden>Suivre ma voix</button>
+    <button id="lecture" type="button">Lancer</button>
+    <button id="prec" type="button" aria-label="Bloc précédent">‹ Bloc</button>
+    <button id="suiv" type="button" aria-label="Bloc suivant">Bloc ›</button>
+    <button id="reprendre" type="button">Reprendre</button>
+    <div class="reglage vit">
+      <button id="lent" type="button" aria-label="Moins vite">−</button>
+      <span id="vitesse"></span>
+      <button id="vite" type="button" aria-label="Plus vite">+</button>
+    </div>
+    <div class="reglage">
+      <button id="petit" type="button" aria-label="Texte plus petit">A−</button>
+      <button id="grand" type="button" aria-label="Texte plus grand">A+</button>
+    </div>
+    <button id="miroir" type="button" aria-pressed="false">Miroir</button>
+    <button id="plein" type="button">Plein écran</button>
+    <span id="aide"></span>
+  </footer>
+</div>
+
+<script>
+const BLOCS = [{"n": "1 · puis 3 s sans bouger", "type": "camera", "text": "Il y a plus de temps entre ces piliers et la Grande Pyramide qu'entre la Grande Pyramide et toi."}, {"n": "2 · puis 6 s sans bouger", "type": "camera", "text": "Et lui, il défend une idée assez simple : des chasseurs-cueilleurs n'ont pas pu faire ça tout seuls, donc quelqu'un leur a appris, et ce quelqu'un, ce seraient les survivants d'une civilisation disparue."}, {"n": "3 · puis 3 s sans bouger", "type": "camera", "text": "Et c'est mon pote qui va les poser."}, {"n": "4 · puis 4 s sans bouger", "type": "camera", "text": "Donc ces piliers, ce sont en fait des personnages de pierre."}, {"n": "5 · puis 4 s sans bouger", "type": "camera", "text": "C'est le même indice, avec deux lectures opposées."}, {"n": "6 · puis 6 s sans bouger", "type": "camera", "text": "Donc ce qu'on lit dans ces papyrus sur la Grande Pyramide, ce n'est ni un rituel ni un secret : c'est un journal de chantier."}, {"n": "7 · puis 6 s sans bouger", "type": "camera", "text": "Donc il existe, il est mesuré."}, {"n": "8 · puis 6 s sans bouger", "type": "camera", "text": "Et c'est là que le dossier devient piégé, parce qu'un indice qui fait rêver n'est pas forcément un indice solide."}, {"n": "9 · puis 6 s sans bouger", "type": "camera", "text": "Et de l'autre, les archéologues regardent ce qu'ils avaient : des outils de pierre par milliers, des céréales sauvages, et de quoi nourrir tout un chantier."}];
+const EP = "ep03", FILTRES = ["tout", "camera", "voix", "reel"];
+const LIBELLE = { camera: "CAMÉRA", voix: "VOIX OFF", reel: "EN VERTICAL" };
+const $ = id => document.getElementById(id);
+const scene = $("scene"), texte = $("texte");
+
+// Réglages gardés dans ce navigateur : la page marche aussi sans.
+const lire = (k, d) => { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (_) { return d; } };
+const garder = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} };
+
+let filtre = lire(EP + ":filtre", "tout"), i = lire(EP + ":i", 0), liste = [], nbMots = 1;
+let mpm = lire("mpm", 168), taille = lire("taille", window.innerWidth < 700 ? 34 : 60);
+let joue = false, y = 0, dernier = 0, finBloc = false, chrono = null, veille = null;
+let mots = [], pos = 0, ecoute = false, rec = null, piste = null;
+// Le micro marche partout où le navigateur l'autorise : fichier ouvert d'un double-clic, oui ; page en ligne, selon l'hébergeur.
+const Reco = window.SpeechRecognition || window.webkitSpeechRecognition;
+const VOIX = !!Reco && !!navigator.mediaDevices && (!document.featurePolicy || document.featurePolicy.allowsFeature("microphone"));
+
+const norm = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "");
+const nomBloc = b => (b.type === "reel" ? "Reel " : "Bloc ") + b.n;
+
+function surligner(phrase) {
+  if (!phrase) return;
+  const cible = phrase.split(" ").map(norm).filter(Boolean);
+  const pleins = mots.map((m, k) => (m.n ? k : -1)).filter(k => k >= 0);
+  for (let a = 0; a + cible.length <= pleins.length; a++) {
+    if (!cible.every((w, c) => mots[pleins[a + c]].n === w)) continue;
+    for (let k = pleins[a]; k <= pleins[a + cible.length - 1]; k++) mots[k].el.classList.add("obj");
+    const label = document.createElement("span"); label.className = "obj-label"; label.textContent = "REGARDE L'OBJECTIF";
+    mots[pleins[a]].el.before(label);
+    return;
+  }
+}
+
+function majDuree() {
+  if (ecoute) return;  // cette place montre ce que le micro entend
+  const s = Math.round(nbMots / mpm * 60);
+  $("duree").textContent = `environ ${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  $("vitesse").textContent = `${mpm} mots/min`;
+}
+
+function majLecture() {
+  document.body.classList.toggle("joue", joue);
+  $("lecture").textContent = chrono ? "Annuler" : joue ? "Pause" : finBloc && i < liste.length - 1 ? "Bloc suivant" : VOIX ? "Défiler tout seul" : "Lancer";
+}
+
+function choisirListe() {
+  liste = BLOCS.filter(b => filtre === "tout" || b.type === filtre);
+  i = Math.max(0, Math.min(i, liste.length - 1));
+  $("filtre").value = filtre;
+  $("bloc").innerHTML = "";
+  liste.forEach((b, k) => { const o = document.createElement("option"); o.value = k; o.textContent = nomBloc(b); $("bloc").appendChild(o); });
+  afficher();
+}
+
+function afficher() {
+  arreter();
+  const b = liste[i];
+  texte.innerHTML = "";
+  mots = [];
+  b.text.split(" ").forEach(w => {
+    const n = norm(w), avant = mots[mots.length - 1];
+    if (!n && avant) { avant.el.textContent += w + " "; return; }  // ponctuation isolée : collée au mot d'avant
+    const s = document.createElement("span"); s.textContent = w + " "; texte.appendChild(s); mots.push({ el: s, n });
+  });
+  nbMots = Math.max(1, mots.filter(m => m.n).length);
+  surligner(b.objectif);
+  pos = 0;
+  if (ecoute) { marquerVoix(); garderEveille(); }
+  // Le début du bloc suivant reste visible : le dire fait passer à ce bloc quand le micro écoute.
+  $("suite").textContent = i < liste.length - 1
+    ? `Ensuite : ${nomBloc(liste[i + 1]).toLowerCase()} · ${liste[i + 1].text.split(" ").slice(0, 7).join(" ").replace(/[.,;:!? ]+$/, "")}…` : "Fin des blocs";
+  $("type").textContent = LIBELLE[b.type]; $("type").className = b.type;
+  $("bloc").value = i;
+  y = 0; finBloc = false; scene.scrollTop = 0;
+  garder(EP + ":filtre", filtre); garder(EP + ":i", i);
+  majDuree(); majLecture();
+}
+
+function boucle(t) {
+  if (!joue) return;
+  const dt = Math.min(0.1, (t - dernier) / 1000); dernier = t;
+  if (Math.abs(scene.scrollTop - y) > 3) y = scene.scrollTop;  // tu as fait défiler à la main
+  y += texte.offsetHeight / (nbMots / mpm * 60) * dt;
+  scene.scrollTop = y;
+  if (y >= texte.offsetHeight) { finBloc = true; arreter(); return; }
+  requestAnimationFrame(boucle);
+}
+
+function demarrer() {
+  joue = true; dernier = performance.now(); majLecture(); garderEveille(); requestAnimationFrame(boucle);
+}
+
+function arreter() {
+  joue = false;
+  if (chrono) { clearInterval(chrono); chrono = null; $("decompte").hidden = true; }
+  if (veille) { veille.release().catch(() => {}); veille = null; }
+  majLecture();
+}
+
+// Écran allumé pendant le défilement, si l'appareil l'accepte.
+async function garderEveille() {
+  try { if (navigator.wakeLock) veille = await navigator.wakeLock.request("screen"); } catch (_) { veille = null; }
+}
+
+// Suivi de la voix : place le mot à dire sur la ligne de lecture.
+function marquerVoix() {
+  mots.forEach((m, k) => { m.el.classList.toggle("dit", ecoute && k < pos); m.el.classList.toggle("ici", ecoute && k === pos); });
+  if (!ecoute) return;
+  y = mots[Math.min(pos, mots.length - 1)].el.offsetTop - texte.offsetTop;
+  scene.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
+}
+
+function proches(a, b) {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  return a.length >= 4 && b.length >= 4 && (a.startsWith(b.slice(0, 4)) || b.startsWith(a.slice(0, 4)));
+}
+
+const CHIFFRES = { un: 1, une: 1, deux: 2, trois: 3, quatre: 4, cinq: 5, six: 6, sept: 7, huit: 8, neuf: 9, dix: 10, onze: 11, douze: 12, treize: 13, quatorze: 14, quinze: 15, seize: 16 };
+
+// « Bloc 5 » dit à voix haute avant une prise : va au début de ce bloc, même si c'est celui en cours.
+function ordreBloc(r) {
+  if (r.length < 2) return false;
+  const nom = r[r.length - 2], val = r[r.length - 1];
+  const reel = /^(reel|real|rail)$/.test(nom);
+  if (!reel && !/^(bloc|block|bloque)$/.test(nom)) return false;
+  const v = /^vingt/.test(val) ? 20 + (CHIFFRES[val.replace(/^vingt(et)?/, "")] || 0) : CHIFFRES[val] || val;
+  const k = liste.findIndex(b => (b.type === "reel") === reel && b.n === String(v));
+  if (k < 0) return false;
+  if (k !== i || pos > 0) { i = k; afficher(); }
+  return true;
+}
+
+// Quatre mots exacts ailleurs dans le bloc : tu reprends une phrase ou tu en sautes une.
+function rattraper(r) {
+  if (r.length < 4) return -1;
+  let best = -1;
+  for (let j = 3; j < mots.length; j++) {
+    if (r.every((w, k) => mots[j - 3 + k].n === w) && (best < 0 || Math.abs(j - pos) < Math.abs(best - pos))) best = j;
+  }
+  return best >= pos - 8 && best < pos ? -1 : best;  // petit retard de la reconnaissance : on ne recule pas
+}
+
+// Fin du bloc : les premiers mots du bloc suivant font passer à ce bloc.
+function blocSuivant(r) {
+  if (pos < mots.length - 3 || i >= liste.length - 1 || r.length < 3) return;
+  const debut = liste[i + 1].text.split(" ").map(norm).filter(Boolean), fin = r.slice(-3);
+  for (let j = 2; j < Math.min(8, debut.length); j++) {
+    if (fin.every((w, k) => debut[j - 2 + k] === w)) { i++; afficher(); pos = j + 1; marquerVoix(); return; }
+  }
+}
+
+// Tolère les mots mal reconnus ou sautés.
+function suivre(entendu) {
+  const tout = entendu.split(/\s+/).map(norm).filter(Boolean);
+  if (!tout.length) return;
+  $("duree").textContent = "J'entends : " + entendu.trim().split(/\s+/).slice(-6).join(" ");
+  if (ordreBloc(tout)) return;
+  const r = tout.slice(-4);
+  let best = -1, bestScore = 0;
+  for (let j = pos; j < Math.min(mots.length, pos + 14); j++) {
+    let score = 0;
+    for (let k = 0; k < r.length; k++) {
+      const jj = j - k; if (jj < 0) break;
+      if (proches(mots[jj].n, r[r.length - 1 - k])) score++;
+    }
+    const assez = score >= 2 || (score === 1 && j - pos <= 2);
+    if (assez && score > bestScore) { best = j; bestScore = score; }
+  }
+  if (best < 0) best = rattraper(r);
+  if (best >= 0) { pos = Math.min(best + 1, mots.length - 1); marquerVoix(); }
+  else blocSuivant(r);
+}
+
+// La reconnaissance s'arrête d'elle-même après un silence : on en relance une sur la même piste,
+// ce qui évite au navigateur de redemander le micro.
+function ecouter() {
+  const r = rec = new Reco(); r.lang = "fr-FR"; r.continuous = true; r.interimResults = true;
+  r.onresult = e => { if (r === rec) suivre(e.results[e.results.length - 1][0].transcript); };
+  r.onerror = e => {
+    if (e.error === "not-allowed" || e.error === "service-not-allowed" || e.error === "audio-capture") { micro(false); $("micro").textContent = "Micro refusé : réessaie"; }
+    else if (e.error === "network") $("duree").textContent = "Pas de connexion à Internet : le suivi de la voix en a besoin";
+  };
+  r.onend = () => { if (ecoute && r === rec) setTimeout(() => { if (ecoute && r === rec) ecouter(); }, 200); };
+  r.start(piste);
+}
+
+async function micro(on) {
+  if (!VOIX) return;
+  ecoute = on;
+  document.body.classList.toggle("ecoute", on);
+  $("micro").textContent = on ? "Micro actif · arrêter" : "Suivre ma voix";
+  $("micro").classList.toggle("actif", on);
+  if (!on) {
+    const r = rec; rec = null; if (r) r.stop();
+    if (piste) { piste.stop(); piste = null; }
+    if (veille) { veille.release().catch(() => {}); veille = null; }
+    marquerVoix(); majDuree();
+    return;
+  }
+  arreter();
+  y = 0; pos = 0; finBloc = false; marquerVoix();
+  $("duree").textContent = "J'entends : rien pour l'instant";
+  garderEveille();
+  try {
+    const flux = await navigator.mediaDevices.getUserMedia({ audio: true });
+    if (!ecoute) { flux.getTracks().forEach(t => t.stop()); return; }
+    piste = flux.getAudioTracks()[0];
+    ecouter();
+  } catch (_) {
+    micro(false);
+    $("micro").textContent = "Micro refusé : réessaie";
+  }
+}
+
+function lancerOuPause() {
+  if (ecoute) { micro(false); return; }
+  if (chrono || joue) { arreter(); return; }
+  if (finBloc) { if (i < liste.length - 1) { i++; afficher(); } return; }
+  y = scene.scrollTop;
+  if (y > 2) { demarrer(); return; }
+  let n = 3;  // le temps de dire le numéro du bloc
+  $("decompte").textContent = n; $("decompte").hidden = false;
+  chrono = setInterval(() => {
+    n--;
+    if (n > 0) { $("decompte").textContent = n; return; }
+    clearInterval(chrono); chrono = null; $("decompte").hidden = true; demarrer();
+  }, 1000);
+  majLecture();
+}
+
+function changerBloc(sens) { const j = i + sens; if (j >= 0 && j < liste.length) { i = j; afficher(); } }
+function changerVitesse(ecart) { mpm = Math.max(80, Math.min(260, mpm + ecart)); garder("mpm", mpm); majDuree(); }
+function changerTaille(ecart) {
+  const part = y / Math.max(1, texte.offsetHeight);
+  taille = Math.max(20, Math.min(120, taille + ecart));
+  document.documentElement.style.setProperty("--taille", taille + "px"); garder("taille", taille);
+  y = part * texte.offsetHeight; scene.scrollTop = y;
+}
+function pleinEcran() {
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  else document.documentElement.requestFullscreen?.().catch(() => {});
+}
+function changerFiltre(f) { filtre = f; i = 0; choisirListe(); }
+// Miroir pour un prompteur à vitre, gardé d'une fois sur l'autre.
+function poserMiroir(on) {
+  miroir = on; garder("miroir", on);
+  document.body.classList.toggle("miroir", on);
+  $("miroir").classList.toggle("actif", on); $("miroir").setAttribute("aria-pressed", on);
+}
+
+const actions = { micro: () => micro(!ecoute), lecture: lancerOuPause, prec: () => changerBloc(-1), suiv: () => changerBloc(1),
+  reprendre: afficher, lent: () => changerVitesse(-10), vite: () => changerVitesse(10),
+  petit: () => changerTaille(-4), grand: () => changerTaille(4), miroir: () => poserMiroir(!miroir), plein: pleinEcran };
+Object.entries(actions).forEach(([id, f]) => $(id).addEventListener("click", e => {
+  f();
+  if (e.detail > 0) e.currentTarget.blur();  // à la souris, Espace ne doit pas réactiver ce bouton
+}));
+if (!document.fullscreenEnabled) $("plein").hidden = true;
+$("micro").hidden = !VOIX;
+document.body.classList.toggle("voix-ok", VOIX);
+$("aide").textContent = VOIX
+  ? "Espace : suivre ma voix ou arrêter · Dire « bloc 5 » : aller au bloc 5 · Toucher un mot : se recaler dessus · ← → : bloc · ↑ ↓ : vitesse · + − : taille · R : reprendre · L : défiler tout seul · C : blocs affichés · I : miroir · F : plein écran"
+  : "Espace : lancer ou pause · ← → : bloc · ↑ ↓ : vitesse · + − : taille · R : reprendre · C : blocs affichés · I : miroir · F : plein écran · Toucher le texte : lancer ou pause";
+scene.addEventListener("click", e => {
+  if (ecoute) {  // toucher un mot : le suivi repart de là
+    const k = mots.findIndex(m => m.el === e.target);
+    if (k >= 0) { pos = k; marquerVoix(); }
+  } else if (!VOIX || joue || chrono) lancerOuPause();
+});
+$("bloc").addEventListener("change", e => { i = +e.target.value; afficher(); e.target.blur(); });
+$("filtre").addEventListener("change", e => { changerFiltre(e.target.value); e.target.blur(); });
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && (joue || ecoute)) garderEveille(); });
+document.addEventListener("keydown", e => {
+  if (e.target.matches("button, select") && [" ", "Enter", "ArrowUp", "ArrowDown"].includes(e.key)) return;
+  const k = e.key.toLowerCase();
+  if (e.key === " ") { e.preventDefault(); if (VOIX && !joue && !chrono) micro(!ecoute); else lancerOuPause(); }
+  else if (e.key === "ArrowRight" || e.key === "PageDown") changerBloc(1);
+  else if (e.key === "ArrowLeft" || e.key === "PageUp") changerBloc(-1);
+  else if (e.key === "ArrowUp") { e.preventDefault(); changerVitesse(10); }
+  else if (e.key === "ArrowDown") { e.preventDefault(); changerVitesse(-10); }
+  else if (e.key === "+" || e.key === "=") changerTaille(4);
+  else if (e.key === "-") changerTaille(-4);
+  else if (k === "m") micro(!ecoute);
+  else if (k === "l" && !ecoute) lancerOuPause();
+  else if (k === "r") afficher();
+  else if (k === "c") changerFiltre(FILTRES[(FILTRES.indexOf(filtre) + 1) % FILTRES.length]);
+  else if (k === "i") poserMiroir(!miroir);
+  else if (k === "f") pleinEcran();
+});
+
+document.documentElement.style.setProperty("--taille", taille + "px");
+let miroir = false;
+poserMiroir(lire("miroir", false));
+choisirListe();
+</script>
+</body></html>
